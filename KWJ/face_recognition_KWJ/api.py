@@ -164,8 +164,11 @@ def _raw_face_landmarks(face_image, face_locations=None, model="large"):
 
     return [pose_predictor(face_image, face_location) for face_location in face_locations]
 
+def raw_face_landmarks(face_image, face_locations=None, model="large"):
+    return _raw_face_landmarks(face_image, face_locations=face_locations, model=model)
 
-def face_landmarks(face_image, face_locations=None, model="large"):
+
+def face_landmarks(face_image, raw_face_landmarks=None,fls=None, model="large"):
     """
     Given an image, returns a dict of face feature locations (eyes, nose, etc) for each face in the image
 
@@ -174,8 +177,9 @@ def face_landmarks(face_image, face_locations=None, model="large"):
     :param model: Optional - which model to use. "large" (default) or "small" which only returns 5 points but is faster.
     :return: A list of dicts of face feature locations (eyes, nose, etc)
     """
-    landmarks = _raw_face_landmarks(face_image, face_locations, model)
-    landmarks_as_tuples = [[(p.x, p.y) for p in landmark.parts()] for landmark in landmarks]
+    if not fls:
+        raw_face_landmarks = _raw_face_landmarks(face_image, fls, model)
+    landmarks_as_tuples = [[(p.x, p.y) for p in landmark.parts()] for landmark in raw_face_landmarks]
 
     # For a definition of each point index, see https://cdn-images-1.medium.com/max/1600/1*AbEg31EgkbXSQehuNJBlWg.png
     if model == 'large':
@@ -200,7 +204,7 @@ def face_landmarks(face_image, face_locations=None, model="large"):
         raise ValueError("Invalid landmarks model type. Supported models are ['small', 'large'].")
 
 
-def face_encodings(face_image, known_face_locations=None, num_jitters=1, model="small"):
+def face_encodings(face_image, known_face_locations=None, raw_face_landmarks=None, num_jitters=1, model="small"):
     """
     Given an image, return the 128-dimension face encoding for each face in the image.
 
@@ -210,8 +214,9 @@ def face_encodings(face_image, known_face_locations=None, num_jitters=1, model="
     :param model: Optional - which model to use. "large" or "small" (default) which only returns 5 points but is faster.
     :return: A list of 128-dimensional face encodings (one for each face in the image)
     """
-    raw_landmarks = _raw_face_landmarks(face_image, known_face_locations, model)
-    return [np.array(face_encoder.compute_face_descriptor(face_image, raw_landmark_set, num_jitters)) for raw_landmark_set in raw_landmarks]
+    if not raw_face_landmarks:
+        raw_face_landmarks = _raw_face_landmarks(face_image, known_face_locations, model)
+    return [np.array(face_encoder.compute_face_descriptor(face_image, raw_landmark_set, num_jitters)) for raw_landmark_set in raw_face_landmarks]
 
 
 def compare_faces(known_face_encodings, face_encoding_to_check, tolerance=0.6):
