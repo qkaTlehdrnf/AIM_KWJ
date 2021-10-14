@@ -1,7 +1,6 @@
-import face_recognition_KWJ as fr
 # import face_recognition_models as frmodels
 # import dlib
-from PIL import Image, ImageDraw
+from functions import frame_to_recognize_KHAN, draw_frame_flmk, draw_battery, frame_mirror, KHAN_encoding
 from djitellopy import Tello
 import cv2
 import pygame
@@ -13,21 +12,9 @@ print(dir_path)
 
 # Speed of the drone
 S = 60
-# Frames per second of the pygame window display
-# A low number also results in input lag, as input information is processed once per frame.
 FPS = 120
 
-
 class FrontEnd(object):
-    """ Maintains the Tello display and moves it through the keyboard keys.
-        Press escape key to quit.
-        The controls are:
-            - T: Takeoff
-            - L: Land
-            - Arrow keys: Forward, backward, left and right.
-            - A and D: Counter clockwise and clockwise rotations (yaw)
-            - W and S: Up and down.
-    """
 
     def __init__(self):
         # Init pygame
@@ -47,33 +34,12 @@ class FrontEnd(object):
         self.yaw_velocity = 0
         self.speed = 10
 
-        self.im_const=4#>=1
+        self.im_const=1#>=1
 
         self.send_rc_control = False
         self.process_this_frame=True
 
-        self.model="small"
-
-        # self.frmodel=frmodels.face_recognition_model_location()
-        # self.fe=dlib.face_recognition_model_v1(self.frmodel)
-
-        # create update timer
         pygame.time.set_timer(pygame.USEREVENT + 1, 1000 // FPS)
-
-    # def face_recog(self):
-    #     face_locations=fr.face_locations(self.frame_PIL)
-    #     face_encodings = fr.face_encodings(self.frame_PIL, face_locations)
-    #     pil_image=Image.fromarray(self.frame_PIL)
-    #     draw=ImageDraw.Draw(pil_image)
-
-    #     for top,right,bottom,left in face_locations:
-    #         name="Unknown"
-    #         draw.rectangle(((left,top),(right,bottom)),outline=(0,0,255))
-    #         text_width,text_height=draw.textsize(name)
-    #         draw.rectangle(((left,bottom-text_height-10),(right,bottom)), fill=(0,0,255),outline=(0,0,255))
-    #         draw.text((left+6,bottom-text_height-5),name,fill=(255,255,255,255))
-    #     return draw
-
 
     def run(self):
 
@@ -88,10 +54,8 @@ class FrontEnd(object):
         frame_read = self.tello.get_frame_read()
 
         should_stop = False
-        My_Image=fr.load_image_file("DJITelloPy\examples\My_Face.png")
-        My_Image_encoding=fr.face_encodings(My_Image)[0]
-        kfes=[My_Image_encoding]
-        kfns=["KHAN"]
+        KHAN_PATH = r'KWJ\faces\KHAN.png'
+        kfes,kfns = KHAN_encoding(KHAN_PATH)
         while not should_stop:
             for event in pygame.event.get():
                 if event.type == pygame.USEREVENT + 1:
@@ -116,60 +80,18 @@ class FrontEnd(object):
             
             if self.process_this_frame:
                 rgb_small_frame = cv2.resize(frame,(0,0), fx=1/self.im_const,fy=1/self.im_const)
-                fls = fr.face_locations(rgb_small_frame)
-                rflmks=fr.raw_face_landmarks(rgb_small_frame,face_locations=fls, model=self.model)
-                fes = fr.face_encodings (rgb_small_frame,fls,rflmks)
-                fns=[]
-                if fes:
-                    flmks = fr.face_landmarks(rgb_small_frame, rflmks, fls, self.model)
-
-                    assert(len(fes)==len(flmks)) 
-                    tot=len(fes)
-
-                    for i in range(tot):
-                        fe=fes[i]
-                        flmk=flmks[i]
-                        matches=fr.compare_faces(kfes,fe)
-                        name="Unknown"
-                        fds = fr.face_distance(kfes,fe)
-                        bmi = np.argmin(fds)
-                        if matches[bmi]:
-                            name=kfns[bmi]
-                            if name=="KHAN":
-                                noseloc=list(map(lambda x: x*self.im_const, flmk['nose_tip'][0])) 
-                                print(noseloc)
-                                cv2.circle(frame,noseloc,30,(255,0,0),cv2.FILLED)
-                        fns.append(name)
+                flmk = frame_to_recognize_KHAN(rgb_small_frame,kfes,kfns)
+                if flmk: frame = draw_frame_flmk(frame,flmk,self.im_const)
+                
+            frame = draw_battery(frame,self.tello.get_battery(),self.tello.get_height())
+            frame = frame_mirror(frame)
             self.process_this_frame = not self.process_this_frame
-
-
-
-            for (top,right,btm,left), fn  in zip(fls,fns):
-                top *=self.im_const
-                right *=self.im_const
-                btm*=self.im_const
-                left *=self.im_const
-                cv2.rectangle(frame,(left,top),(right,btm),(0,0,255),2)
-                cv2.rectangle(frame, (left, btm-35), (right,btm), (0,0,255), cv2.FILLED)
-                font=cv2.FONT_HERSHEY_DUPLEX
-                cv2.putText(frame,fn,(left+6,btm-6),font,1.0,(255,255,255),1)
-
-            text = "Battery: {}%\tHeight: {}".format(self.tello.get_battery(),self.tello.get_height())
-            cv2.putText(frame, text, (5, 720 - 5),
-                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-            frame = np.rot90(frame)#whole screen rotate
-            frame = np.flipud(frame)#'Battery ##%' will flip L-R
-            self.frame_PIL = np.array(frame)
-            # frame = self.face_recog()
-            # print(type(frame))
-            #frame = fr.load_image_file(frame)
-            #face_locations=face
 
             frame = pygame.surfarray.make_surface(frame)
             self.screen.blit(frame, (0, 0))
             pygame.display.update()
 
-            time.sleep(1 / FPS)
+            # time.sleep(1 / FPS)
 
         # Call it always before finishing. To deallocate resources.
         self.tello.end()
