@@ -23,13 +23,16 @@ def frame_to_recognize_KHAN(frame,kfes,kfns):
             bmi = np.argmin(fds)
             if matches[bmi]:
                 if kfns[bmi]=="KHAN":
-                    KHAN_L=[]
-                    KHAN_L.append(np.array(flmk['nose_tip'][0]))
-                    KHAN_L.append(np.array((np.array(flmk['left_eye'][0])+np.array(flmk['left_eye'][1]))*0.5,dtype=np.int32))
-                    KHAN_L.append(np.array((np.array(flmk['right_eye'][0])+np.array(flmk['right_eye'][1]))*0.5,dtype=np.int32))
-                    return np.array(KHAN_L)
+                    return dic2nparray(flmk)
             fns.append(name)
     return False
+    
+def dic2nparray(flmk):
+    np_list=[]
+    np_list.append(np.array(flmk['nose_tip'][0]))
+    np_list.append(np.array((np.array(flmk['left_eye'][0])+np.array(flmk['left_eye'][1]))*0.5,dtype=np.int32))
+    np_list.append(np.array((np.array(flmk['right_eye'][0])+np.array(flmk['right_eye'][1]))*0.5,dtype=np.int32))
+    return np.array(np_list)
 
 def draw_frame_flmk(frame, flmk, im_const):
     print(flmk)
